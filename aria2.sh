@@ -11,6 +11,7 @@
 # System Required: CentOS/Debian/Ubuntu
 # Version: 2.7.4
 #
+
 sh_ver="2.7.4"
 export PATH=~/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin
 aria2_conf_dir="/root/.aria2c"
@@ -27,6 +28,7 @@ Font_color_suffix="\033[0m"
 Info="[${Green_font_prefix}信息${Font_color_suffix}]"
 Error="[${Red_font_prefix}错误${Font_color_suffix}]"
 Tip="[${Green_font_prefix}注意${Font_color_suffix}]"
+
 check_root() {
     [[ $EUID != 0 ]] && echo -e "${Error} 当前非ROOT账号(或没有ROOT权限)，无法继续操作，请更换ROOT账号或使用 ${Green_background_prefix}sudo su${Font_color_suffix} 命令获取临时ROOT权限（执行后可能会提示输入当前账号的密码）。" && exit 1
 }
@@ -75,11 +77,12 @@ check_pid() {
 check_new_ver() {
     aria2_new_ver=$(
         {
-            wget -t2 -T3 -qO- "https://shturl.c/api/v1/repos/yukaidi/aria2/releases/latest"
+            wget -t2 -T3 -qO- "https://api.github.com/repos/P3TERX/Aria2-Pro-Core/releases/latest" ||
+                wget -t2 -T3 -qO- "https://gh-api.p3terx.com/repos/P3TERX/Aria2-Pro-Core/releases/latest"
         } | grep -o '"tag_name": ".*"' | head -n 1 | cut -d'"' -f4
     )
     if [[ -z ${aria2_new_ver} ]]; then
-        echo -e "${Error} Aria2 最新版本获取失败，请手动获取最新版本号[ shturl.cc/isOgbQdHTFddSwzV02jBA7tZZpNClIv ]"
+        echo -e "${Error} Aria2 最新版本获取失败，请手动获取最新版本号[ https://github.com/P3TERX/Aria2-Pro-Core/releases ]"
         read -e -p "请输入版本号:" aria2_new_ver
         [[ -z "${aria2_new_ver}" ]] && echo "取消..." && exit 1
     fi
@@ -113,9 +116,10 @@ Download_aria2() {
         echo -e "${Info} 删除旧版 Aria2 二进制文件..."
         rm -vf $(which aria2c)
     done
-    DOWNLOAD_URL="shturl.cc/isOgbQdHTFddSwzV02jBA7tZZpNClIv/download/${aria2_new_ver}/aria2-${aria2_new_ver%_*}-static-linux-${ARCH}.tar.gz"
+    DOWNLOAD_URL="https://github.com/P3TERX/Aria2-Pro-Core/releases/download/${aria2_new_ver}/aria2-${aria2_new_ver%_*}-static-linux-${ARCH}.tar.gz"
     {
-        wget -t2 -T3 -O- "${DOWNLOAD_URL}"
+        wget -t2 -T3 -O- "${DOWNLOAD_URL}" ||
+            wget -t2 -T3 -O- "https://gh-acc.p3terx.com/${DOWNLOAD_URL}"
     } | tar -zx
     [[ ! -s "aria2c" ]] && echo -e "${Error} Aria2 下载失败 !" && exit 1
     [[ ${update_dl} = "update" ]] && rm -f "${aria2c}"
@@ -285,6 +289,7 @@ Set_aria2_RPC_passwd() {
     fi
     echo -e "
  ${Tip} Aria2 RPC 密钥不要包含等号(=)和井号(#)，留空为随机生成。
+
  当前 RPC 密钥为: ${Green_font_prefix}${aria2_passwd_1}${Font_color_suffix}
 "
     read -e -p " 请输入新的 RPC 密钥: " aria2_RPC_passwd
@@ -423,6 +428,7 @@ Set_aria2_vim_conf() {
     aria2_dir_old=${aria2_dir}
     echo -e "
  配置文件位置：${Green_font_prefix}${aria2_conf}${Font_color_suffix}
+
  ${Tip} 手动修改配置文件须知：
  
  ${Green_font_prefix}1.${Font_color_suffix} 默认使用 nano 文本编辑器打开
@@ -486,14 +492,14 @@ View_Aria2() {
     check_installed_status
     Read_config
     IPV4=$(
-        wget -qO- -t1 -T2 -4 shturl.cc/IV ||
-            wget -qO- -t1 -T2 -4 shturl.cc/ln3O ||
-            wget -qO- -t1 -T2 -4 shturl.cc/aJceuuUg
+        wget -qO- -t1 -T2 -4 api.ip.sb/ip ||
+            wget -qO- -t1 -T2 -4 ifconfig.io/ip ||
+            wget -qO- -t1 -T2 -4 www.trackip.net/ip
     )
     IPV6=$(
-        wget -qO- -t1 -T2 -6 shturl.cc/IV ||
-            wget -qO- -t1 -T2 -6 shturl.cc/ln3O ||
-            wget -qO- -t1 -T2 -6 shturl.cc/aJceuuUg
+        wget -qO- -t1 -T2 -6 api.ip.sb/ip ||
+            wget -qO- -t1 -T2 -6 ifconfig.io/ip ||
+            wget -qO- -t1 -T2 -6 www.trackip.net/ip
     )
     [[ -z "${IPV4}" ]] && IPV4="IPv4 地址检测失败"
     [[ -z "${IPV6}" ]] && IPV6="IPv6 地址检测失败"
@@ -526,7 +532,7 @@ Clean_Log() {
     echo -e "${Info} Aria2 日志已清空 !"
 }
 crontab_update_status() {
-    crontab -l | grep "shturl.cc/"
+    crontab -l | grep "tracker.sh"
 }
 Update_bt_tracker_cron() {
     check_installed_status
@@ -556,8 +562,8 @@ Update_bt_tracker_cron() {
 crontab_update_start() {
     crontab -l >"/tmp/crontab.bak"
     sed -i "/aria2.sh update-bt-tracker/d" "/tmp/crontab.bak"
-    sed -i "/shturl.cc//d" "/tmp/crontab.bak"
-    echo -e "\n0 7 * * * /bin/bash <(wget -qO- git.io/shturl.cc/) ${aria2_conf} RPC 2>&1 | tee ${aria2_conf_dir}/tracker.log" >>"/tmp/crontab.bak"
+    sed -i "/tracker.sh/d" "/tmp/crontab.bak"
+    echo -e "\n0 7 * * * /bin/bash <(wget -qO- git.io/tracker.sh) ${aria2_conf} RPC 2>&1 | tee ${aria2_conf_dir}/tracker.log" >>"/tmp/crontab.bak"
     crontab "/tmp/crontab.bak"
     rm -f "/tmp/crontab.bak"
     if [[ -z $(crontab_update_status) ]]; then
@@ -569,8 +575,8 @@ crontab_update_start() {
 }
 crontab_update_stop() {
     crontab -l >"/tmp/crontab.bak"
-    sed -i "/aria2.sh/d" "/tmp/crontab.bak"
-    sed -i "/shturl.cc//d" "/tmp/crontab.bak"
+    sed -i "/aria2.sh update-bt-tracker/d" "/tmp/crontab.bak"
+    sed -i "/tracker.sh/d" "/tmp/crontab.bak"
     crontab "/tmp/crontab.bak"
     rm -f "/tmp/crontab.bak"
     if [[ -n $(crontab_update_status) ]]; then
@@ -583,9 +589,9 @@ Update_bt_tracker() {
     check_installed_status
     check_pid
     [[ -z $PID ]] && {
-        bash <(wget -qO- git.io/shturl.cc/) ${aria2_conf}
+        bash <(wget -qO- git.io/tracker.sh) ${aria2_conf}
     } || {
-        bash <(wget -qO- git.io/shturl.cc/) ${aria2_conf} RPC
+        bash <(wget -qO- git.io/tracker.sh) ${aria2_conf} RPC
     }
 }
 Update_aria2() {
@@ -602,7 +608,7 @@ Uninstall_aria2() {
     if [[ ${unyn} == [Yy] ]]; then
         crontab -l >"/tmp/crontab.bak"
         sed -i "/aria2.sh/d" "/tmp/crontab.bak"
-        sed -i "/shturl.cc//d" "/tmp/crontab.bak"
+        sed -i "/tracker.sh/d" "/tmp/crontab.bak"
         crontab "/tmp/crontab.bak"
         rm -f "/tmp/crontab.bak"
         check_pid
@@ -651,7 +657,7 @@ Set_iptables() {
     fi
 }
 Update_Shell() {
-    sh_new_ver=$(wget -qO- -t1 -T3 "https://raw.githubusercontent.com/xiaoxin3242/aria2.sh/master/aria2.sh" | grep 'sh_ver="' | awk -F "=" '{print $NF}' | sed 's/\"//g' | head -1) && sh_new_type="github"
+    sh_new_ver=$(wget -qO- -t1 -T3 "https://raw.githubusercontent.com/P3TERX/aria2.sh/master/aria2.sh" | grep 'sh_ver="' | awk -F "=" '{print $NF}' | sed 's/\"//g' | head -1) && sh_new_type="github"
     [[ -z ${sh_new_ver} ]] && echo -e "${Error} 无法链接到 Github !" && exit 0
     if [[ -e "/etc/init.d/aria2" ]]; then
         rm -rf /etc/init.d/aria2
@@ -661,9 +667,10 @@ Update_Shell() {
     if [[ -n $(crontab_update_status) ]]; then
         crontab_update_stop
     fi
-    wget -N "https://raw.githubusercontent.com/xiaoxin3242/aria2.sh/master/aria2.sh" && chmod +x aria2.sh
+    wget -N "https://raw.githubusercontent.com/P3TERX/aria2.sh/master/aria2.sh" && chmod +x aria2.sh
     echo -e "脚本已更新为最新版本[ ${sh_new_ver} ] !(注意：因为更新方式为直接覆盖当前运行的脚本，所以可能下面会提示一些报错，无视即可)" && exit 0
 }
+
 echo && echo -e " Aria2 一键安装管理脚本 增强版 ${Red_font_prefix}[v${sh_ver}]${Font_color_suffix} by \033[1;35mP3TERX.COM\033[0m
  
  ${Green_font_prefix} 0.${Font_color_suffix} 升级脚本
